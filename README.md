@@ -1,38 +1,36 @@
-🎯 Project Objective
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-A privacy-first, open-source web app to let users track the performance of their Bitcoin DCA purchases after moving funds to a cold wallet.
-Users upload their purchase history (CSV) + optionally provide a watch-only wallet (xpub/address) → the app shows portfolio value in fiat, average cost basis, and unrealized P&L.
+## Getting Started
 
-⸻
+First, run the development server:
 
-🔹 Core Features (MVP)
-	•	CSV upload: parse user’s BTC purchases (date, amount, fiat).
-	•	xpub/address input: fetch live on-chain balance from public API.
-	•	Fiat valuation: real-time BTC price (EUR/USD).
-	•	Performance metrics: total invested, average cost basis (PMA), current value, unrealized P&L (% and absolute).
-	•	Simple UI: upload form + results (table + chart).
-	•	Privacy-first: no keys, no custody, calculations client-side.
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-⸻
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-🔹 Minimal Tech Stack
-	•	Framework: Next.js (React, App Router) → deploy serverless on Vercel.
-	•	Styling: Tailwind CSS (or shadcn/ui).
-	•	CSV parsing: papaparse (client-side).
-	•	Validation: zod (inputs, CSV).
-	•	Charts: Chart.js / Recharts.
-	•	APIs:
-	•	CoinGecko (BTC spot + historical price).
-	•	Mempool.space / Blockstream (xpub/address balance).
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-⸻
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-🔹 Best Practices (Security & Privacy)
-	•	Read-only only: never request seeds/private keys.
-	•	Local-first: keep CSV + calculations in browser, not on server.
-	•	Minimal API proxying: only for prices and blockchain data, without logging xpub.
-	•	HTTPS + CSP: enforce secure headers, HTTPS-only.
-	•	Open-source transparency: code and build verifiable on GitHub.
-	•	No trackers/ads: zero third-party scripts by default.
-	•	UI disclaimer: clear banner “Read-only, we never ask for private keys.”
-	•	Auto-hosting option: allow users to self-host for maximum trust
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
