@@ -2,15 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import CSVUpload from '@/components/csv-upload';
+import PortfolioChart from '@/components/portfolio-chart';
+import AdvancedMetrics from '@/components/advanced-metrics';
+import DataExport from '@/components/data-export';
+import TimeFilter, { TimeFilter as TimeFilterType } from '@/components/time-filter';
+import PortfolioComparison from '@/components/portfolio-comparison';
+import { DashboardLoadingState } from '@/components/loading-states';
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
 import { calculatePortfolioMetrics } from '@/lib/portfolio-calculator';
 import { getCurrentBitcoinPrice, formatPrice, formatPriceChange, BitcoinPrice } from '@/lib/bitcoin-price';
+import { savePortfolioData, loadPortfolioData, clearPortfolioData } from '@/lib/storage';
 
 export default function Dashboard() {
   const [purchases, setPurchases] = useState<BitcoinPurchase[]>([]);
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
   const [bitcoinPrice, setBitcoinPrice] = useState<BitcoinPrice | null>(null);
   const [priceLoading, setPriceLoading] = useState(true);
+  const [filteredPurchases, setFilteredPurchases] = useState<BitcoinPurchase[]>([]);
+  const [activeTimeFilter, setActiveTimeFilter] = useState<TimeFilterType>('all');
+
+  // Load stored data on component mount
+  useEffect(() => {
+    const storedPurchases = loadPortfolioData();
+    if (storedPurchases && storedPurchases.length > 0) {
+      setPurchases(storedPurchases);
+    }
+  }, []);
 
   // Fetch Bitcoin price on component mount
   useEffect(() => {
@@ -28,16 +45,44 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Recalculate metrics when purchases or price changes
+  // Initialize filtered purchases
   useEffect(() => {
-    if (purchases.length > 0 && bitcoinPrice) {
-      const calculatedMetrics = calculatePortfolioMetrics(purchases, bitcoinPrice.usd);
+    setFilteredPurchases(purchases);
+  }, [purchases]);
+
+  // Recalculate metrics when filtered purchases or price changes
+  useEffect(() => {
+    if (filteredPurchases.length > 0 && bitcoinPrice) {
+      const calculatedMetrics = calculatePortfolioMetrics(filteredPurchases, bitcoinPrice.usd);
       setMetrics(calculatedMetrics);
+    } else if (filteredPurchases.length === 0) {
+      setMetrics(null);
     }
-  }, [purchases, bitcoinPrice]);
+  }, [filteredPurchases, bitcoinPrice]);
+
+  // Auto-save purchases to localStorage
+  useEffect(() => {
+    if (purchases.length > 0) {
+      savePortfolioData(purchases);
+    }
+  }, [purchases]);
 
   const handleDataParsed = (data: BitcoinPurchase[]) => {
     setPurchases(data);
+    setFilteredPurchases(data);
+  };
+
+  const handleTimeFilterChange = (filtered: BitcoinPurchase[], filter: TimeFilterType) => {
+    setFilteredPurchases(filtered);
+    setActiveTimeFilter(filter);
+  };
+
+  const handleClearData = () => {
+    if (confirm('Are you sure you want to clear all portfolio data? This action cannot be undone.')) {
+      setPurchases([]);
+      setMetrics(null);
+      clearPortfolioData();
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -87,7 +132,12 @@ export default function Dashboard() {
             </h1>
             <div className="flex items-center gap-4">
               <p className="text-gray-600 dark:text-gray-300">
-                {purchases.length} purchases analyzed
+                {purchases.length} purchases • {filteredPurchases.length} shown
+                {activeTimeFilter !== 'all' && (
+                  <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-xs rounded-full">
+                    {activeTimeFilter}
+                  </span>
+                )}
               </p>
               {bitcoinPrice && (
                 <div className="flex items-center gap-2">
@@ -112,99 +162,73 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => {
-              setPurchases([]);
-              setMetrics(null);
-            }}
-            className="text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            Upload New Data
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleClearData}
+              className="text-sm bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-2 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
+            >
+              Clear Data
+            </button>
+            <button
+              onClick={() => {
+                setPurchases([]);
+                setMetrics(null);
+              }}
+              className="text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Upload New Data
+            </button>
+          </div>
         </div>
+
+        {/* Show loading state if we have purchases but no price yet */}
+        {purchases.length > 0 && !bitcoinPrice && (
+          <DashboardLoadingState />
+        )}
+
+        {purchases.length > 0 && (
+          <>
+            {/* Time Filter */}
+            <TimeFilter 
+              purchases={purchases}
+              onFilterChange={handleTimeFilterChange}
+            />
+
+            {metrics && bitcoinPrice && (
+              <div className="space-y-8">
+                {/* Advanced Metrics */}
+                <AdvancedMetrics 
+                  purchases={filteredPurchases} 
+                  metrics={metrics} 
+                  currentBTCPrice={bitcoinPrice.usd} 
+                />
+
+                {/* Portfolio Chart */}
+                <PortfolioChart 
+                  purchases={filteredPurchases} 
+                  currentBTCPrice={bitcoinPrice.usd} 
+                />
+
+                {/* Portfolio Comparison */}
+                <PortfolioComparison 
+                  purchases={purchases}
+                  metrics={calculatePortfolioMetrics(purchases, bitcoinPrice.usd)}
+                  currentBTCPrice={bitcoinPrice.usd}
+                />
+
+                {/* Data Export */}
+                <DataExport 
+                  purchases={filteredPurchases} 
+                  metrics={metrics} 
+                  currentBTCPrice={bitcoinPrice.usd} 
+                />
+              </div>
+            )}
+          </>
+        )}
 
         {metrics && (
           <>
-            {/* Key Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                    <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Bitcoin</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatBTC(metrics.totalBTC)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                    <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invested</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(metrics.totalInvested)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                    <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Cost Basis</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(metrics.averageCostBasis)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className={`p-2 rounded-lg ${
-                    metrics.unrealizedPnL >= 0 
-                      ? 'bg-green-100 dark:bg-green-900/20' 
-                      : 'bg-red-100 dark:bg-red-900/20'
-                  }`}>
-                    <svg className={`w-6 h-6 ${
-                      metrics.unrealizedPnL >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unrealized P&L</p>
-                    <p className={`text-2xl font-bold ${
-                      metrics.unrealizedPnL >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {formatCurrency(metrics.unrealizedPnL)}
-                    </p>
-                    <p className={`text-sm ${
-                      metrics.unrealizedPnL >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      ({metrics.unrealizedPnLPercent > 0 ? '+' : ''}{metrics.unrealizedPnLPercent.toFixed(2)}%)
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Purchase History Table */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -223,7 +247,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {purchases.map((purchase, index) => (
+                    {filteredPurchases.map((purchase, index) => (
                       <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {formatDate(purchase.date)}
