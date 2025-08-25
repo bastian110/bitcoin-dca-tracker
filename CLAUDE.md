@@ -38,9 +38,9 @@ The project is designed as a **Next.js application** with the following key prin
 Since this is a new project with only a README.md currently present:
 
 1. **Security Focus**: Always prioritize privacy and security - never handle private keys
-2. **Client-side First**: Keep sensitive operations in the browser, minimize server-side processing  
-3. **API Proxying**: When needed, proxy external API calls without logging sensitive data (xpub)
-4. **Progressive Enhancement**: Start with core CSV upload and basic calculations, then add blockchain integration
+2. **Client-side First**: Keep sensitive operations in the browser 
+3. **Progressive Enhancement**: Start with core CSV upload and basic calculations, then add blockchain integration
+4. **Always Think simply**: Always use the simplest sufficient approach, don't overegineer solutions
 
 ## Key Features to Implement
 
