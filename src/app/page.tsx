@@ -40,9 +40,9 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
-            <button className="bg-orange-600 hover:bg-orange-700 text-white font-medium px-8 py-3 rounded-lg transition-colors">
+            <a href="/dashboard" className="inline-block bg-orange-600 hover:bg-orange-700 text-white font-medium px-8 py-3 rounded-lg transition-colors">
               Get Started
-            </button>
+            </a>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Open source • No registration required • Read-only operations
             </p>
