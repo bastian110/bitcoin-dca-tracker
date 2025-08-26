@@ -41,7 +41,8 @@ Since this is a new project with only a README.md currently present:
 2. **Client-side First**: Keep sensitive operations in the browser 
 3. **Progressive Enhancement**: Start with core CSV upload and basic calculations, then add blockchain integration
 4. **Always Think simply**: Always use the simplest sufficient approach, don't overegineer solutions
-5. **Commit**: Commit frequently to have checkpoint save
+5. **Branch**: Always start and work on a new branch at the begining of each new feature development
+6. **Commit**: Commit frequently to have checkpoint save
 
 ## Key Features to Implement
 

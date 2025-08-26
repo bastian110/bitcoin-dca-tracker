@@ -42,12 +42,42 @@ export function parseCSV(csvContent: string): ParseResult {
         
         // Smart field mapping - handle both English and French column names
         const getFieldValue = (englishName: string, frenchName?: string): string | undefined => {
-          return (csvRow as Record<string, string>)[englishName] || (frenchName ? (csvRow as Record<string, string>)[frenchName] : undefined);
+          const csvRowData = csvRow as Record<string, string>;
+          
+          // Try exact matches first (including quoted keys)
+          if (csvRowData[englishName]) return csvRowData[englishName];
+          if (csvRowData[`"${englishName}"`]) return csvRowData[`"${englishName}"`];
+          if (frenchName && csvRowData[frenchName]) return csvRowData[frenchName];
+          if (frenchName && csvRowData[`"${frenchName}"`]) return csvRowData[`"${frenchName}"`];
+          
+          // Try case-insensitive matches
+          for (const key in csvRowData) {
+            const cleanKey = key.replace(/"/g, '');
+            if (cleanKey.toLowerCase() === englishName.toLowerCase()) return csvRowData[key];
+            if (frenchName && cleanKey.toLowerCase() === frenchName.toLowerCase()) return csvRowData[key];
+          }
+          
+          return undefined;
         };
         
         const parseNumber = (value: string | undefined, defaultValue: number = 0): number => {
           if (!value || value === '') return defaultValue;
-          const cleanValue = value.replace(',', '.');
+          
+          // Handle different number formats
+          let cleanValue = value.toString().trim();
+          
+          // Remove any non-numeric characters except decimal separators
+          cleanValue = cleanValue.replace(/[^\d,.-]/g, '');
+          
+          // Handle European format (comma as decimal separator)
+          if (cleanValue.includes(',') && cleanValue.includes('.')) {
+            // Format like "1.234,56" (European) - keep comma as decimal
+            cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
+          } else if (cleanValue.includes(',')) {
+            // Single comma - could be decimal separator
+            cleanValue = cleanValue.replace(',', '.');
+          }
+          
           const parsed = parseFloat(cleanValue);
           return isNaN(parsed) ? defaultValue : parsed;
         };
@@ -59,12 +89,23 @@ export function parseCSV(csvContent: string): ParseResult {
         let fiat_amount = 0;
         let fiat_currency = '';
         
-        // French exchange format detection
-        const amountReceived = parseNumber(getFieldValue('amount_received', 'montant_recu'));
-        const currencyReceived = getFieldValue('currency_received', 'monnaie_ou_jeton_recu')?.toUpperCase();
-        const amountSent = parseNumber(getFieldValue('amount_sent', 'montant_envoye'));
-        const currencySent = getFieldValue('currency_sent', 'monnaie_ou_jeton_envoye')?.toUpperCase();
-        const receivedTokenPrice = parseNumber(getFieldValue('received_token_price', 'prix_du_jeton_du_montant_recu'));
+        // French exchange format detection with transformed field names
+        const amountReceived = parseNumber(getFieldValue('montant_reçu')) || 
+                             parseNumber(getFieldValue('amount_received'));
+        
+        const currencyReceived = getFieldValue('monnaie_ou_jeton_reçu')?.toUpperCase() ||
+                               getFieldValue('currency_received')?.toUpperCase();
+        
+        const amountSent = parseNumber(getFieldValue('montant_envoyé')) ||
+                         parseNumber(getFieldValue('amount_sent'));
+        
+        const currencySent = getFieldValue('monnaie_ou_jeton_envoyé')?.toUpperCase() ||
+                           getFieldValue('currency_sent')?.toUpperCase();
+        
+        const receivedTokenPrice = parseNumber(getFieldValue('prix_du_jeton_du_montant_recu')) ||
+                                 parseNumber(getFieldValue('received_token_price'));
+        
+        
         
         if (currencyReceived === 'BTC' && amountReceived > 0) {
           // French format: receiving BTC
@@ -90,6 +131,7 @@ export function parseCSV(csvContent: string): ParseResult {
         const feeCurrency = getFieldValue('fee_currency', 'monnaie_ou_jeton_des_frais');
         const feeTokenPrice = parseNumber(getFieldValue('fee_token_price', 'prix_du_jeton_des_frais'));
         
+        
         if (feeAmount > 0) {
           if (feeCurrency === 'EUR') {
             fee_usd = feeAmount * 1.1; // Rough EUR to USD conversion
@@ -104,6 +146,7 @@ export function parseCSV(csvContent: string): ParseResult {
           fee_usd = parseNumber(getFieldValue('fee_usd'));
         }
         
+
         const purchaseData = {
           date: getFieldValue('date') || new Date().toISOString(),
           amount_btc,
