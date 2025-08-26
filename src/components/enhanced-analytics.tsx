@@ -1,20 +1,19 @@
 'use client';
 
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { Globe, Hash, MapPin, TrendingUp, DollarSign, Repeat, Clock } from 'lucide-react';
 
 interface EnhancedAnalyticsProps {
   purchases: BitcoinPurchase[];
   metrics: PortfolioMetrics;
+  selectedCurrency?: string;
 }
 
-export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyticsProps) {
-  const formatCurrency = (amount: number, currency?: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-    }).format(amount);
+export default function EnhancedAnalytics({ purchases, metrics, selectedCurrency = 'USD' }: EnhancedAnalyticsProps) {
+  const formatCurrencyAmount = (amount: number) => {
+    return formatCurrency(amount, selectedCurrency);
   };
 
   const formatBTC = (amount: number) => {
@@ -69,7 +68,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Primary Currency</p>
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{metrics.primaryFiatCurrency}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{formatCurrency(metrics.totalFiatAmount, metrics.primaryFiatCurrency)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{formatCurrencyAmount(metrics.totalFiatAmount)}</p>
               </div>
             </div>
           </div>
@@ -81,7 +80,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Effective Price</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(metrics.averageEffectivePrice)}</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrencyAmount(metrics.averageEffectivePrice)}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Including all fees</p>
               </div>
             </div>
@@ -155,7 +154,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-gray-900 dark:text-white">{formatBTC(exchange.totalBTC)}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Avg: {formatCurrency(exchange.avgPrice)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Avg: {formatCurrencyAmount(exchange.avgPrice)}</p>
                   </div>
                 </div>
               ))}
@@ -174,7 +173,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
               <YAxis tickFormatter={(value) => `${value.toLocaleString()}`} />
               <Tooltip 
                 formatter={(value: number, name: string) => [
-                  name === 'amount' ? formatCurrency(value, 'USD') : value,
+                  name === 'amount' ? formatCurrencyAmount(value) : value,
                   name === 'amount' ? 'Amount' : 'Purchases'
                 ]}
               />
@@ -262,7 +261,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
                 {new Date(metrics.largestPurchase.date).toLocaleDateString()}
               </p>
               <p className="text-sm text-green-700 dark:text-green-400">
-                @ {formatCurrency(metrics.largestPurchase.price)}
+                @ {formatCurrencyAmount(metrics.largestPurchase.price)}
               </p>
             </div>
           </div>
@@ -277,7 +276,7 @@ export default function EnhancedAnalytics({ purchases, metrics }: EnhancedAnalyt
                 {new Date(metrics.smallestPurchase.date).toLocaleDateString()}
               </p>
               <p className="text-sm text-blue-700 dark:text-blue-400">
-                @ {formatCurrency(metrics.smallestPurchase.price)}
+                @ {formatCurrencyAmount(metrics.smallestPurchase.price)}
               </p>
             </div>
           </div>

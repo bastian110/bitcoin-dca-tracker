@@ -5,24 +5,23 @@ import { Download, FileText, Table, BarChart3, Share2 } from 'lucide-react';
 import Papa from 'papaparse';
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
 import { calculateDCAPerformance } from '@/lib/portfolio-calculator';
+import { formatCurrency } from '@/lib/currency';
 
 interface DataExportProps {
   purchases: BitcoinPurchase[];
   metrics: PortfolioMetrics;
   currentBTCPrice: number;
+  selectedCurrency?: string;
 }
 
 type ExportFormat = 'csv' | 'json' | 'summary';
 
-export default function DataExport({ purchases, metrics, currentBTCPrice }: DataExportProps) {
+export default function DataExport({ purchases, metrics, currentBTCPrice, selectedCurrency = 'USD' }: DataExportProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+  const formatCurrencyAmount = (amount: number) => {
+    return formatCurrency(amount, selectedCurrency);
   };
 
   const generateCSVData = () => {
@@ -78,14 +77,14 @@ Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString
 PORTFOLIO OVERVIEW
 ====================================
 Total Bitcoin Holdings: ₿${metrics.totalBTC.toFixed(8)}
-Current Portfolio Value: ${formatCurrency(metrics.currentValue)}
-Total Amount Invested: ${formatCurrency(metrics.totalInvested)}
-Total Fees Paid: ${formatCurrency(metrics.totalFees)}
+Current Portfolio Value: ${formatCurrencyAmount(metrics.currentValue)}
+Total Amount Invested: ${formatCurrencyAmount(metrics.totalInvested)}
+Total Fees Paid: ${formatCurrencyAmount(metrics.totalFees)}
 
-Average Cost Basis: ${formatCurrency(metrics.averageCostBasis)}
-Current Bitcoin Price: ${formatCurrency(currentBTCPrice)}
+Average Cost Basis: ${formatCurrencyAmount(metrics.averageCostBasis)}
+Current Bitcoin Price: ${formatCurrencyAmount(currentBTCPrice)}
 
-Unrealized P&L: ${formatCurrency(metrics.unrealizedPnL)} (${metrics.unrealizedPnLPercent.toFixed(2)}%)
+Unrealized P&L: ${formatCurrencyAmount(metrics.unrealizedPnL)} (${metrics.unrealizedPnLPercent.toFixed(2)}%)
 
 ====================================
 INVESTMENT STATISTICS
@@ -95,7 +94,7 @@ Investment Period: ${daysSinceFirst} days
 First Purchase: ${new Date(metrics.firstPurchaseDate).toLocaleDateString()}
 Last Purchase: ${new Date(metrics.lastPurchaseDate).toLocaleDateString()}
 
-Average Purchase Amount: ${formatCurrency(metrics.totalInvested / metrics.purchaseCount)}
+Average Purchase Amount: ${formatCurrencyAmount(metrics.totalInvested / metrics.purchaseCount)}
 Average Days Between Purchases: ${(daysSinceFirst / metrics.purchaseCount).toFixed(1)}
 
 Fee Efficiency: ${((metrics.totalFees / metrics.totalInvested) * 100).toFixed(2)}% of total investment
@@ -104,7 +103,7 @@ Fee Efficiency: ${((metrics.totalFees / metrics.totalInvested) * 100).toFixed(2)
 RECENT PURCHASES (Last 5)
 ====================================
 ${purchases.slice(-5).reverse().map((p) => 
-`${new Date(p.date).toLocaleDateString()}: ₿${p.amount_btc.toFixed(8)} at ${formatCurrency(p.price_usd)} (${p.exchange || 'Unknown'})`
+`${new Date(p.date).toLocaleDateString()}: ₿${p.amount_btc.toFixed(8)} at ${formatCurrencyAmount(p.price_usd)} (${p.exchange || 'Unknown'})`
 ).join('\n')}
 
 ====================================
@@ -173,8 +172,8 @@ https://your-domain.com
   const sharePortfolio = async () => {
     const summaryText = `My Bitcoin DCA Portfolio:
 ₿${metrics.totalBTC.toFixed(4)} BTC
-${formatCurrency(metrics.currentValue)} current value
-${formatCurrency(metrics.unrealizedPnL)} P&L (${metrics.unrealizedPnLPercent.toFixed(1)}%)
+${formatCurrencyAmount(metrics.currentValue)} current value
+${formatCurrencyAmount(metrics.unrealizedPnL)} P&L (${metrics.unrealizedPnLPercent.toFixed(1)}%)
 ${metrics.purchaseCount} purchases over ${Math.floor((new Date().getTime() - new Date(metrics.firstPurchaseDate).getTime()) / (1000 * 60 * 60 * 24))} days
 
 #Bitcoin #DCA #HODL`;

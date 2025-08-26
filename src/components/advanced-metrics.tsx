@@ -1,12 +1,14 @@
 'use client';
 
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 import { TrendingUp, TrendingDown, Calendar, DollarSign, Bitcoin, Target, Clock, Activity } from 'lucide-react';
 
 interface AdvancedMetricsProps {
   purchases: BitcoinPurchase[];
   metrics: PortfolioMetrics;
   currentBTCPrice: number;
+  selectedCurrency?: string;
 }
 
 interface MetricCardProps {
@@ -68,12 +70,9 @@ function MetricCard({ title, value, subValue, icon, trend, trendValue, descripti
   );
 }
 
-export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice }: AdvancedMetricsProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice, selectedCurrency = 'USD' }: AdvancedMetricsProps) {
+  const formatCurrencyAmount = (amount: number) => {
+    return formatCurrency(amount, selectedCurrency);
   };
 
   const formatBTC = (amount: number) => {
@@ -107,23 +106,23 @@ export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice }:
           <MetricCard
             title="Total Bitcoin"
             value={formatBTC(metrics.totalBTC)}
-            subValue={`Worth ${formatCurrency(metrics.currentValue)}`}
+            subValue={`Worth ${formatCurrencyAmount(metrics.currentValue)}`}
             icon={<Bitcoin className="w-6 h-6 text-orange-600 dark:text-orange-400" />}
             description="Total Bitcoin accumulated through DCA"
           />
           
           <MetricCard
             title="Total Invested"
-            value={formatCurrency(metrics.totalInvested)}
-            subValue={`Including ${formatCurrency(metrics.totalFees)} in fees`}
+            value={formatCurrencyAmount(metrics.totalInvested)}
+            subValue={`Including ${formatCurrencyAmount(metrics.totalFees)} in fees`}
             icon={<DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />}
             description="Total USD invested including fees"
           />
           
           <MetricCard
             title="Average Cost Basis"
-            value={formatCurrency(metrics.averageCostBasis)}
-            subValue={`vs Current: ${formatCurrency(currentBTCPrice)}`}
+            value={formatCurrencyAmount(metrics.averageCostBasis)}
+            subValue={`vs Current: ${formatCurrencyAmount(currentBTCPrice)}`}
             icon={<Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />}
             trend={priceVsCostBasis >= 0 ? 'up' : 'down'}
             trendValue={formatPercent(priceVsCostBasis)}
@@ -132,7 +131,7 @@ export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice }:
           
           <MetricCard
             title="Unrealized P&L"
-            value={formatCurrency(metrics.unrealizedPnL)}
+            value={formatCurrencyAmount(metrics.unrealizedPnL)}
             subValue={formatPercent(metrics.unrealizedPnLPercent)}
             icon={<Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />}
             trend={metrics.unrealizedPnL >= 0 ? 'up' : 'down'}
@@ -148,7 +147,7 @@ export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice }:
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <MetricCard
             title="Average Purchase"
-            value={formatCurrency(avgPurchaseAmount)}
+            value={formatCurrencyAmount(avgPurchaseAmount)}
             subValue={`Across ${metrics.purchaseCount} purchases`}
             icon={<DollarSign className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />}
             description="Average amount per purchase"

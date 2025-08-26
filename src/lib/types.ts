@@ -33,6 +33,10 @@ export const BitcoinPurchaseSchema = z.object({
   fiat_amount: z.number().optional(), // Total fiat amount (EUR, USD, etc.)
   fiat_currency: z.string().optional(), // Fiat currency used
   effective_price: z.number().optional(), // Effective price including fees
+  
+  // Enhanced fiat handling
+  price_fiat: z.number().optional(), // Price in fiat currency (alternative to price_usd)
+  fee_fiat: z.number().optional(), // Fee in fiat currency (alternative to fee_usd)
 });
 
 export const CSVRowSchema = z.object({
@@ -83,6 +87,29 @@ export const CSVRowSchema = z.object({
 export type BitcoinPurchase = z.infer<typeof BitcoinPurchaseSchema>;
 export type CSVRow = z.infer<typeof CSVRowSchema>;
 
+// New types for enhanced calculations
+export type Basis = 'execution' | 'effective';
+
+export interface FXRates {
+  getRate: (from: string, to: string, date?: string) => number | null;
+}
+
+export interface MetricOptions {
+  basis?: Basis; // default: 'effective'
+}
+
+export interface CurrencyOptions {
+  fiat?: string;        // target, default 'USD'
+  fx?: FXRates | null;  // required if mixing currencies
+}
+
+export type DCAMode = 'toDate' | 'markToMarket';
+
+export interface DCAOptions extends MetricOptions, CurrencyOptions {
+  mode?: DCAMode; // default 'toDate'
+  getHistoricalPrice?: (date: string) => number; // required if mode='markToMarket'
+}
+
 export interface PortfolioMetrics {
   // Core metrics (backwards compatible)
   totalBTC: number;
@@ -125,4 +152,41 @@ export interface PortfolioMetrics {
     date: string;
     price: number;
   };
+  
+  // Enhanced purchase size metrics (separate BTC and fiat)
+  largestPurchaseBTC: {
+    amountBTC: number;
+    date: string;
+  };
+  smallestPurchaseBTC: {
+    amountBTC: number;
+    date: string;
+  };
+  largestPurchaseFiat: {
+    amountFiat: number;
+    date: string;
+  };
+  smallestPurchaseFiat: {
+    amountFiat: number;
+    date: string;
+  };
+  
+  // Enhanced cost basis metrics
+  averageExecutionPrice: number; // Excludes fees
+  averageEffectiveCostBasis: number; // Includes fees (renamed for clarity)
+  
+  // Currency normalization info
+  targetFiat: string; // The target fiat currency used for calculations
+}
+
+export interface DCAPerformancePoint {
+  date: string;
+  purchaseIndex: number;
+  runningBTC: number;
+  runningInvested: number;
+  avgCostBasis: number;
+  priceUsed: number;
+  currentValue: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercent: number;
 }

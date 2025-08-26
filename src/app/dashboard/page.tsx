@@ -10,9 +10,11 @@ import EnhancedAnalytics from '@/components/enhanced-analytics';
 import PortfolioComparison from '@/components/portfolio-comparison';
 import { DashboardLoadingState } from '@/components/loading-states';
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
-import { calculatePortfolioMetrics } from '@/lib/portfolio-calculator';
+import { calculatePortfolioMetrics, detectCurrenciesInPurchases } from '@/lib/portfolio-calculator';
 import { getCurrentBitcoinPrice, formatPrice, formatPriceChange, BitcoinPrice } from '@/lib/bitcoin-price';
 import { savePortfolioData, loadPortfolioData, clearPortfolioData } from '@/lib/storage';
+import { saveSelectedCurrency, loadSelectedCurrency, formatCurrency as formatCurrencyUtil, MockFXProvider } from '@/lib/currency';
+import CurrencySettings from '@/components/currency-settings';
 
 export default function Dashboard() {
   const [purchases, setPurchases] = useState<BitcoinPurchase[]>([]);
@@ -21,14 +23,31 @@ export default function Dashboard() {
   const [priceLoading, setPriceLoading] = useState(true);
   const [filteredPurchases, setFilteredPurchases] = useState<BitcoinPurchase[]>([]);
   const [activeTimeFilter, setActiveTimeFilter] = useState<TimeFilterType>('all');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([]);
+  const [fxProvider] = useState(new MockFXProvider());
 
-  // Load stored data on component mount
+  // Load stored data and currency preference on component mount
   useEffect(() => {
     const storedPurchases = loadPortfolioData();
     if (storedPurchases && storedPurchases.length > 0) {
       setPurchases(storedPurchases);
     }
+    
+    // Load saved currency preference
+    const savedCurrency = loadSelectedCurrency();
+    setSelectedCurrency(savedCurrency);
   }, []);
+  
+  // Update available currencies when purchases change
+  useEffect(() => {
+    if (purchases.length > 0) {
+      const detected = detectCurrenciesInPurchases(purchases);
+      setAvailableCurrencies(detected);
+    } else {
+      setAvailableCurrencies([]);
+    }
+  }, [purchases]);
 
   // Fetch Bitcoin price on component mount
   useEffect(() => {
@@ -51,15 +70,22 @@ export default function Dashboard() {
     setFilteredPurchases(purchases);
   }, [purchases]);
 
-  // Recalculate metrics when filtered purchases or price changes
+  // Recalculate metrics when filtered purchases, price, or currency changes
   useEffect(() => {
     if (filteredPurchases.length > 0 && bitcoinPrice) {
-      const calculatedMetrics = calculatePortfolioMetrics(filteredPurchases, bitcoinPrice.usd);
+      const calculatedMetrics = calculatePortfolioMetrics(
+        filteredPurchases, 
+        bitcoinPrice.usd,
+        {
+          fiat: selectedCurrency,
+          fx: fxProvider,
+        }
+      );
       setMetrics(calculatedMetrics);
     } else if (filteredPurchases.length === 0) {
       setMetrics(null);
     }
-  }, [filteredPurchases, bitcoinPrice]);
+  }, [filteredPurchases, bitcoinPrice, selectedCurrency, fxProvider]);
 
   // Auto-save purchases to localStorage
   useEffect(() => {
@@ -86,11 +112,13 @@ export default function Dashboard() {
     }
   };
 
+  const handleCurrencyChange = (currency: string) => {
+    setSelectedCurrency(currency);
+    saveSelectedCurrency(currency);
+  };
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return formatCurrencyUtil(amount, selectedCurrency);
   };
 
   const formatBTC = (amount: number) => {
@@ -164,6 +192,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex gap-2">
+            <CurrencySettings
+              selectedCurrency={selectedCurrency}
+              onCurrencyChange={handleCurrencyChange}
+              availableCurrencies={availableCurrencies}
+            />
             <button
               onClick={handleClearData}
               className="text-sm bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-2 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
@@ -201,7 +234,8 @@ export default function Dashboard() {
                 <AdvancedMetrics 
                   purchases={filteredPurchases} 
                   metrics={metrics} 
-                  currentBTCPrice={bitcoinPrice.usd} 
+                  currentBTCPrice={bitcoinPrice.usd}
+                  selectedCurrency={selectedCurrency}
                 />
 
                 {/* Portfolio Chart */}
@@ -214,6 +248,7 @@ export default function Dashboard() {
                 <EnhancedAnalytics 
                   purchases={filteredPurchases}
                   metrics={metrics}
+                  selectedCurrency={selectedCurrency}
                 />
 
                 {/* Portfolio Comparison */}
@@ -226,7 +261,8 @@ export default function Dashboard() {
                 <DataExport 
                   purchases={filteredPurchases} 
                   metrics={metrics} 
-                  currentBTCPrice={bitcoinPrice.usd} 
+                  currentBTCPrice={bitcoinPrice.usd}
+                  selectedCurrency={selectedCurrency}
                 />
               </div>
             )}
@@ -246,9 +282,9 @@ export default function Dashboard() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount (BTC)</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price (USD)</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Cost</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fee</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price ({selectedCurrency})</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Cost ({selectedCurrency})</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fee ({selectedCurrency})</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Exchange</th>
                     </tr>
                   </thead>
@@ -268,7 +304,7 @@ export default function Dashboard() {
                           {formatCurrency(purchase.amount_btc * purchase.price_usd)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          {formatCurrency(purchase.fee_usd)}
+                          {formatCurrency(purchase.fee_usd || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {purchase.exchange || '-'}
