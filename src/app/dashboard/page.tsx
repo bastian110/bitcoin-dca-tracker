@@ -6,6 +6,7 @@ import PortfolioChart from '@/components/portfolio-chart';
 import AdvancedMetrics from '@/components/advanced-metrics';
 import DataExport from '@/components/data-export';
 import TimeFilter, { TimeFilter as TimeFilterType } from '@/components/time-filter';
+import EnhancedAnalytics from '@/components/enhanced-analytics';
 import PortfolioComparison from '@/components/portfolio-comparison';
 import { DashboardLoadingState } from '@/components/loading-states';
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
@@ -207,6 +208,12 @@ export default function Dashboard() {
                 <PortfolioChart 
                   purchases={filteredPurchases} 
                   currentBTCPrice={bitcoinPrice.usd} 
+                />
+
+                {/* Enhanced Analytics */}
+                <EnhancedAnalytics 
+                  purchases={filteredPurchases}
+                  metrics={metrics}
                 />
 
                 {/* Portfolio Comparison */}

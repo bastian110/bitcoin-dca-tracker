@@ -40,13 +40,97 @@ export function parseCSV(csvContent: string): ParseResult {
 
         const csvRow = csvRowResult.data;
         
+        // Smart field mapping - handle both English and French column names
+        const getFieldValue = (englishName: string, frenchName?: string): string | undefined => {
+          return (csvRow as Record<string, string>)[englishName] || (frenchName ? (csvRow as Record<string, string>)[frenchName] : undefined);
+        };
+        
+        const parseNumber = (value: string | undefined, defaultValue: number = 0): number => {
+          if (!value || value === '') return defaultValue;
+          const cleanValue = value.replace(',', '.');
+          const parsed = parseFloat(cleanValue);
+          return isNaN(parsed) ? defaultValue : parsed;
+        };
+        
+        // Determine Bitcoin amount and price from various formats
+        let amount_btc = 0;
+        let price_usd = 0;
+        let fee_usd = 0;
+        let fiat_amount = 0;
+        let fiat_currency = '';
+        
+        // French exchange format detection
+        const amountReceived = parseNumber(getFieldValue('amount_received', 'montant_recu'));
+        const currencyReceived = getFieldValue('currency_received', 'monnaie_ou_jeton_recu')?.toUpperCase();
+        const amountSent = parseNumber(getFieldValue('amount_sent', 'montant_envoye'));
+        const currencySent = getFieldValue('currency_sent', 'monnaie_ou_jeton_envoye')?.toUpperCase();
+        const receivedTokenPrice = parseNumber(getFieldValue('received_token_price', 'prix_du_jeton_du_montant_recu'));
+        
+        if (currencyReceived === 'BTC' && amountReceived > 0) {
+          // French format: receiving BTC
+          amount_btc = amountReceived;
+          fiat_amount = amountSent;
+          fiat_currency = currencySent || 'EUR';
+          price_usd = receivedTokenPrice > 0 ? receivedTokenPrice : (amountSent > 0 ? amountSent / amountReceived : 0);
+          
+          // Convert EUR to USD if needed (approximate rate for calculation)
+          if (fiat_currency === 'EUR' && receivedTokenPrice === 0) {
+            price_usd = price_usd * 1.1; // Rough EUR to USD conversion
+          }
+        } else {
+          // Original format or fallback
+          amount_btc = parseNumber(getFieldValue('amount_btc'));
+          price_usd = parseNumber(getFieldValue('price_usd'));
+          fiat_amount = amount_btc * price_usd;
+          fiat_currency = 'USD';
+        }
+        
+        // Handle fees
+        const feeAmount = parseNumber(getFieldValue('fee_amount', 'frais'));
+        const feeCurrency = getFieldValue('fee_currency', 'monnaie_ou_jeton_des_frais');
+        const feeTokenPrice = parseNumber(getFieldValue('fee_token_price', 'prix_du_jeton_des_frais'));
+        
+        if (feeAmount > 0) {
+          if (feeCurrency === 'EUR') {
+            fee_usd = feeAmount * 1.1; // Rough EUR to USD conversion
+          } else if (feeCurrency === 'USD') {
+            fee_usd = feeAmount;
+          } else if (feeTokenPrice > 0) {
+            fee_usd = feeAmount * feeTokenPrice;
+          } else {
+            fee_usd = feeAmount; // Assume same currency as purchase
+          }
+        } else {
+          fee_usd = parseNumber(getFieldValue('fee_usd'));
+        }
+        
         const purchaseData = {
-          date: csvRow.date,
-          amount_btc: parseFloat(csvRow.amount_btc),
-          price_usd: parseFloat(csvRow.price_usd),
-          fee_usd: csvRow.fee_usd ? parseFloat(csvRow.fee_usd) : 0,
-          exchange: csvRow.exchange,
-          notes: csvRow.notes,
+          date: getFieldValue('date') || new Date().toISOString(),
+          amount_btc,
+          price_usd,
+          fee_usd,
+          exchange: getFieldValue('exchange') || getFieldValue('description'),
+          notes: getFieldValue('notes') || getFieldValue('description'),
+          
+          // Enhanced fields
+          type: getFieldValue('type'),
+          timezone: getFieldValue('timezone', 'fuseau_horaire'),
+          amount_received: amountReceived,
+          currency_received: currencyReceived,
+          amount_sent: amountSent,
+          currency_sent: currencySent,
+          fee_amount: feeAmount,
+          fee_currency: feeCurrency,
+          description: getFieldValue('description'),
+          sent_token_price: parseNumber(getFieldValue('sent_token_price', 'prix_du_jeton_du_montant_envoye')),
+          received_token_price: receivedTokenPrice,
+          fee_token_price: feeTokenPrice,
+          address: getFieldValue('address', 'adresse'),
+          transaction_hash: getFieldValue('transaction_hash'),
+          external_id: getFieldValue('external_id', 'id_externe'),
+          fiat_amount,
+          fiat_currency,
+          effective_price: fiat_amount > 0 ? (fiat_amount + fee_usd) / amount_btc : price_usd,
         };
 
         const purchaseResult = BitcoinPurchaseSchema.safeParse(purchaseData);
@@ -82,13 +166,52 @@ export function parseCSV(csvContent: string): ParseResult {
   return result;
 }
 
-export function generateSampleCSV(): string {
-  const headers = ['date', 'amount_btc', 'price_usd', 'fee_usd', 'exchange', 'notes'];
-  const sampleData = [
-    ['2024-01-15', '0.001', '42000', '2.5', 'Coinbase', 'First purchase'],
-    ['2024-02-15', '0.0015', '45000', '3.0', 'Coinbase', 'Monthly DCA'],
-    ['2024-03-15', '0.002', '38000', '4.0', 'Kraken', 'Bought the dip'],
-  ];
+export function generateSampleCSV(format: 'simple' | 'french' | 'enhanced' = 'simple'): string {
+  if (format === 'simple') {
+    const headers = ['date', 'amount_btc', 'price_usd', 'fee_usd', 'exchange', 'notes'];
+    const sampleData = [
+      ['2024-01-15', '0.001', '42000', '2.5', 'Coinbase', 'First purchase'],
+      ['2024-02-15', '0.0015', '45000', '3.0', 'Coinbase', 'Monthly DCA'],
+      ['2024-03-15', '0.002', '38000', '4.0', 'Kraken', 'Bought the dip'],
+    ];
+    return Papa.unparse([headers, ...sampleData]);
+  }
   
-  return Papa.unparse([headers, ...sampleData]);
+  if (format === 'french') {
+    const headers = [
+      'Type', 'Date', 'Fuseau horaire', 'Montant reçu', 'Monnaie ou jeton reçu', 
+      'Montant envoyé', 'Monnaie ou jeton envoyé', 'Frais', 'Monnaie ou jeton des frais', 
+      'Description', 'Prix du jeton du montant envoyé', 'Prix du jeton du montant recu', 
+      'Prix du jeton des frais', 'Adresse', 'Transaction hash', 'ID Externe'
+    ];
+    const sampleData = [
+      ['Échange', '2024-01-15T10:30:00Z', 'GMT', '0.001', 'BTC', '42', 'EUR', '0.5', 'EUR', 
+       'Achat par carte', '', '42000', '', '', '', 'abc123-def456'],
+      ['Échange', '2024-02-15T14:20:00Z', 'GMT', '0.0015', 'BTC', '67.5', 'EUR', '0.75', 'EUR', 
+       'Achat par virement', '', '45000', '', '', '', 'def789-ghi012'],
+      ['Échange', '2024-03-15T09:15:00Z', 'GMT', '0.002', 'BTC', '76', 'EUR', '1.0', 'EUR', 
+       'Achat pendant la baisse', '', '38000', '', '', '', 'ghi345-jkl678'],
+    ];
+    return Papa.unparse([headers, ...sampleData]);
+  }
+  
+  if (format === 'enhanced') {
+    const headers = [
+      'date', 'amount_btc', 'price_usd', 'fee_usd', 'exchange', 'notes',
+      'type', 'timezone', 'amount_received', 'currency_received', 'amount_sent', 'currency_sent',
+      'fee_amount', 'fee_currency', 'description', 'sent_token_price', 'received_token_price',
+      'address', 'transaction_hash', 'external_id', 'fiat_currency'
+    ];
+    const sampleData = [
+      ['2024-01-15T10:30:00Z', '0.001', '42000', '2.5', 'Binance', 'Card purchase', 
+       'Exchange', 'GMT', '0.001', 'BTC', '42', 'EUR', '2.5', 'EUR', 'Card purchase',
+       '', '42000', 'bc1q...abc123', 'hash123...', 'ext-001', 'EUR'],
+      ['2024-02-15T14:20:00Z', '0.0015', '45000', '3.0', 'Kraken', 'Bank transfer',
+       'Exchange', 'GMT', '0.0015', 'BTC', '67.5', 'EUR', '3.0', 'EUR', 'Bank transfer', 
+       '', '45000', 'bc1q...def456', 'hash456...', 'ext-002', 'EUR'],
+    ];
+    return Papa.unparse([headers, ...sampleData]);
+  }
+  
+  return Papa.unparse([]);
 }

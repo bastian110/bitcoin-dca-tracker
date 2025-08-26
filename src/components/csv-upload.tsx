@@ -71,13 +71,13 @@ export default function CSVUpload({ onDataParsed }: CSVUploadProps) {
     setIsDragOver(false);
   };
 
-  const downloadSample = () => {
-    const csv = generateSampleCSV();
+  const downloadSample = (format: 'simple' | 'french' | 'enhanced' = 'simple') => {
+    const csv = generateSampleCSV(format);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bitcoin-purchases-sample.csv';
+    a.download = `bitcoin-purchases-sample-${format}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -90,12 +90,24 @@ export default function CSVUpload({ onDataParsed }: CSVUploadProps) {
           Upload your Bitcoin purchase history as a CSV file. All processing happens in your browser - no data is sent to any server.
         </p>
         
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button
-            onClick={downloadSample}
+            onClick={() => downloadSample('simple')}
             className="text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
-            Download Sample CSV
+            Simple CSV Sample
+          </button>
+          <button
+            onClick={() => downloadSample('french')}
+            className="text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-2 rounded hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors"
+          >
+            French Exchange Sample
+          </button>
+          <button
+            onClick={() => downloadSample('enhanced')}
+            className="text-sm bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-3 py-2 rounded hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
+          >
+            Enhanced Format Sample
           </button>
         </div>
       </div>
@@ -180,16 +192,33 @@ export default function CSVUpload({ onDataParsed }: CSVUploadProps) {
         </div>
       )}
 
-      <div className="mt-6 text-sm text-gray-600 dark:text-gray-400">
-        <p className="font-medium mb-2">Expected CSV format:</p>
-        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded font-mono text-xs overflow-x-auto">
-          date,amount_btc,price_usd,fee_usd,exchange,notes<br />
-          2024-01-15,0.001,42000,2.5,Coinbase,First purchase<br />
-          2024-02-15,0.0015,45000,3.0,Coinbase,Monthly DCA
+      <div className="mt-6 space-y-4 text-sm text-gray-600 dark:text-gray-400">
+        <div>
+          <p className="font-medium mb-2">Simple Format (Minimal Required):</p>
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded font-mono text-xs overflow-x-auto">
+            date,amount_btc,price_usd,fee_usd,exchange,notes<br />
+            2024-01-15,0.001,42000,2.5,Coinbase,First purchase<br />
+            2024-02-15,0.0015,45000,3.0,Coinbase,Monthly DCA
+          </div>
         </div>
-        <p className="mt-2 text-xs">
-          Required: date, amount_btc, price_usd | Optional: fee_usd, exchange, notes
-        </p>
+        
+        <div>
+          <p className="font-medium mb-2">French Exchange Format (Auto-detected):</p>
+          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded font-mono text-xs overflow-x-auto">
+            Type,Date,Fuseau horaire,Montant reçu,Monnaie ou jeton reçu,Montant envoyé...<br />
+            Échange,2024-01-15T10:30:00Z,GMT,0.001,BTC,42,EUR,0.5,EUR,Achat...
+          </div>
+        </div>
+        
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+          <p className="text-amber-800 dark:text-amber-200 font-medium text-xs mb-1">Supported Formats:</p>
+          <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+            <li>• <strong>Minimal:</strong> date, amount_btc, price_usd (Required fields only)</li>
+            <li>• <strong>Enhanced:</strong> All optional fields for detailed analytics</li>
+            <li>• <strong>French Exchanges:</strong> Auto-converts from French column names</li>
+            <li>• <strong>Multi-Currency:</strong> Supports EUR, USD, and other fiat currencies</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
