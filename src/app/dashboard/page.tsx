@@ -241,7 +241,12 @@ export default function Dashboard() {
                 {/* Portfolio Chart */}
                 <PortfolioChart 
                   purchases={filteredPurchases} 
-                  currentBTCPrice={bitcoinPrice.usd} 
+                  currentBTCPrice={bitcoinPrice.usd}
+                  selectedCurrency={selectedCurrency}
+                  currencyOptions={{
+                    fiat: selectedCurrency,
+                    fx: fxProvider,
+                  }}
                 />
 
                 {/* Enhanced Analytics */}
