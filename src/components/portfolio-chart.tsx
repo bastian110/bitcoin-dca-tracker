@@ -3,12 +3,90 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { BitcoinPurchase, CurrencyOptions } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
-import { useState } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3, Info } from 'lucide-react';
+
+// Import the currency normalization functions
+const num = (x: unknown, d = 0) => {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : d;
+};
+
+function rowCostFiatExclFees(p: BitcoinPurchase, options?: CurrencyOptions): number {
+  const fx = options?.fx ?? null;
+  const target = options?.fiat ?? 'USD';
+
+  // Prefer explicit fiat_amount (excl. fees)
+  if (num(p.fiat_amount) > 0) {
+    const from = p.fiat_currency; // SHOULD exist if fiat_amount exists
+    if (!from) {
+      console.warn('fiat_amount provided without fiat_currency; assuming target currency.');
+      return num(p.fiat_amount);
+    }
+    if (from === target) return num(p.fiat_amount);
+    if (!fx) throw new Error(`FX required to convert ${from}->${target}`);
+    const r = fx.getRate(from, target, p.date) ?? fx.getRate(from, target);
+    if (!r) throw new Error(`Missing FX ${from}->${target} on ${p.date ?? 'n/a'}`);
+    return num(p.fiat_amount) * r;
+  }
+
+  // Next: price_fiat with fiat_currency
+  if (num(p.price_fiat) > 0 && p.fiat_currency) {
+    const from = p.fiat_currency;
+    const base = num(p.amount_btc) * num(p.price_fiat);
+    if (from === target) return base;
+    if (!fx) throw new Error(`FX required to convert ${from}->${target}`);
+    const r = fx.getRate(from, target, p.date) ?? fx.getRate(from, target);
+    if (!r) throw new Error(`Missing FX ${from}->${target} on ${p.date ?? 'n/a'}`);
+    return base * r;
+  }
+
+  // Fallback: USD path
+  const baseUSD = num(p.amount_btc) * num(p.price_usd);
+  if (target === 'USD') return baseUSD;
+  if (!fx) throw new Error(`FX required to convert USD->${target}`);
+  const r = fx.getRate('USD', target, p.date) ?? fx.getRate('USD', target);
+  if (!r) throw new Error(`Missing FX USD->${target} on ${p.date ?? 'n/a'}`);
+  return baseUSD * r;
+}
+
+function rowFeeFiat(p: BitcoinPurchase, options?: CurrencyOptions): number {
+  const fx = options?.fx ?? null;
+  const target = options?.fiat ?? 'USD';
+
+  // Try fee_fiat with currency first
+  if (num(p.fee_fiat) > 0 && p.fiat_currency) {
+    const from = p.fiat_currency;
+    if (from === target) return num(p.fee_fiat);
+    if (!fx) throw new Error(`FX required to convert ${from}->${target}`);
+    const r = fx.getRate(from, target, p.date) ?? fx.getRate(from, target);
+    if (!r) throw new Error(`Missing FX ${from}->${target} on ${p.date ?? 'n/a'}`);
+    return num(p.fee_fiat) * r;
+  }
+
+  // Try fee_amount with fee_currency
+  if (num(p.fee_amount) > 0 && p.fee_currency) {
+    const from = p.fee_currency;
+    if (from === target) return num(p.fee_amount);
+    if (!fx) throw new Error(`FX required to convert ${from}->${target}`);
+    const r = fx.getRate(from, target, p.date) ?? fx.getRate(from, target);
+    if (!r) throw new Error(`Missing FX ${from}->${target} on ${p.date ?? 'n/a'}`);
+    return num(p.fee_amount) * r;
+  }
+
+  // Fallback: USD path
+  const feeUSD = num(p.fee_usd) || 0;
+  if (target === 'USD') return feeUSD;
+  if (!fx) throw new Error(`FX required to convert USD->${target}`);
+  const r = fx.getRate('USD', target, p.date) ?? fx.getRate('USD', target);
+  if (!r) throw new Error(`Missing FX USD->${target} on ${p.date ?? 'n/a'}`);
+  return feeUSD * r;
+}
 
 interface PortfolioChartProps {
   purchases: BitcoinPurchase[];
   currentBTCPrice: number;
+  currentPriceCurrency?: string;    // Currency of currentBTCPrice, default 'USD'
   selectedCurrency?: string;
   currencyOptions?: CurrencyOptions;
 }
@@ -36,17 +114,43 @@ type DCAMode = 'both' | 'markToMarket' | 'toDate';
 
 export default function PortfolioChart({ 
   purchases, 
-  currentBTCPrice, 
-  selectedCurrency = 'USD'
+  currentBTCPrice,
+  currentPriceCurrency = 'USD',
+  selectedCurrency = 'USD',
+  currencyOptions
 }: PortfolioChartProps) {
   const [chartType, setChartType] = useState<ChartType>('portfolio-value');
   const [dcaMode, setDcaMode] = useState<DCAMode>('both');
+  const gid = useId(); // Unique gradient IDs to prevent collisions
   
-  if (purchases.length === 0) {
-    return null;
+  // Force a single target fiat for both compute & format
+  const targetFiat = currencyOptions?.fiat ?? selectedCurrency;
+  
+  // Warn if divergent values in development
+  if (process.env.NODE_ENV !== 'production' && selectedCurrency !== targetFiat) {
+    console.warn(`[PortfolioChart] selectedCurrency(${selectedCurrency}) != currencyOptions.fiat(${targetFiat}). Using ${targetFiat} for both.`);
   }
 
-  // Calculate comprehensive performance data
+  // Convert current BTC price to target currency with explicit source currency
+  const convertCurrentPriceToTargetCurrency = (price: number, priceCur = 'USD'): number => {
+    const fx = currencyOptions?.fx ?? null;
+    if (priceCur === targetFiat) return price;
+    if (!fx) {
+      console.warn(`Need FX to convert ${priceCur}->${targetFiat}. Using original price.`);
+      return price;
+    }
+    const rate = fx.getRate(priceCur, targetFiat);
+    if (!rate) {
+      console.warn(`Missing FX ${priceCur}->${targetFiat}. Using original price.`);
+      return price;
+    }
+    return price * rate;
+  };
+  
+  // Unified currency formatter
+  const formatCurrencyAmount = (value: number) => formatCurrency(value, targetFiat);
+
+  // Calculate comprehensive performance data with proper currency normalization
   const calculateComprehensivePerformance = (): PerformanceDataPoint[] => {
     const sortedPurchases = [...purchases].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -56,17 +160,33 @@ export default function PortfolioChart({
     let runningInvested = 0;
 
     return sortedPurchases.map((purchase, index) => {
-      // Update running totals
-      runningBTC += purchase.amount_btc;
-      runningInvested += (purchase.amount_btc * purchase.price_usd) + (purchase.fee_usd || 0);
+      // Get normalized values for this purchase in target currency
+      const rowCost = rowCostFiatExclFees(purchase, currencyOptions);  // Cost excluding fees
+      const rowFee = rowFeeFiat(purchase, currencyOptions);            // Fee amount in target currency
+      
+      // CRITICAL: Update running totals correctly
+      // - Fees are included in runningInvested for P&L calculations  
+      // - But fees are NOT added to priceAtBuy (purchase price should exclude fees)
+      runningBTC += num(purchase.amount_btc);
+      runningInvested += rowCost + rowFee;  // Total invested includes fees
+
+      // Calculate priceAtBuy in target currency (EXCLUDING fees) for THIS specific purchase
+      // This is the pure purchase price without fees, properly normalized to target currency
+      const priceAtBuy = num(purchase.amount_btc) > 0 ? rowCost / num(purchase.amount_btc) : 0;
 
       // Mark-to-Market calculations (historical perspective)
-      const valueMTM = runningBTC * purchase.price_usd;
+      // Use priceAtBuy (which is already normalized and excludes fees)
+      const valueMTM = runningBTC * priceAtBuy;
       const pnlMTM = valueMTM - runningInvested;
       const pnlPercentMTM = runningInvested > 0 ? (pnlMTM / runningInvested) * 100 : 0;
 
-      // ToDate calculations (current perspective)
-      const valueToDate = runningBTC * currentBTCPrice;
+      // ToDate calculations (current perspective) 
+      // Convert current BTC price to target currency
+      const currentPriceInTargetCurrency = convertCurrentPriceToTargetCurrency(
+        num(currentBTCPrice),
+        currentPriceCurrency
+      );
+      const valueToDate = runningBTC * currentPriceInTargetCurrency;
       const pnlToDate = valueToDate - runningInvested;
       const pnlPercentToDate = runningInvested > 0 ? (pnlToDate / runningInvested) * 100 : 0;
 
@@ -79,23 +199,28 @@ export default function PortfolioChart({
         fullDate: purchase.date,
         purchaseIndex: index + 1,
         runningBTC,
-        runningInvested,
+        runningInvested,        // Includes fees (correct for P&L)
         valueMTM,
         pnlMTM,
         pnlPercentMTM,
         valueToDate,
         pnlToDate,
         pnlPercentToDate,
-        priceAtBuy: purchase.price_usd,
+        priceAtBuy,             // Normalized to target currency, excludes fees (correct for MTM calculations)
       };
     });
   };
 
-  const performanceData = calculateComprehensivePerformance();
+  // Memoize performance data to prevent recalculation on every render
+  const performanceData = useMemo(() => {
+    if (purchases.length === 0) {
+      return [];
+    }
+    return calculateComprehensivePerformance();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchases, currencyOptions, targetFiat, currentBTCPrice, currentPriceCurrency]);
 
-  const formatCurrencyAmount = (value: number) => {
-    return formatCurrency(value, selectedCurrency);
-  };
+  // formatCurrencyAmount is now defined earlier with targetFiat
 
   const formatPercent = (value: number) => {
     return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -165,15 +290,15 @@ export default function PortfolioChart({
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart data={performanceData}>
               <defs>
-                <linearGradient id="investedGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`investedGradient-${gid}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#6b7280" stopOpacity={0}/>
                 </linearGradient>
-                <linearGradient id="mtmGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`mtmGradient-${gid}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
-                <linearGradient id="todateGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`todateGradient-${gid}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                 </linearGradient>
@@ -189,7 +314,7 @@ export default function PortfolioChart({
                 dataKey="runningInvested"
                 stroke="#6b7280"
                 strokeDasharray="5 5"
-                fill="url(#investedGradient)"
+                fill={`url(#investedGradient-${gid})`}
                 strokeWidth={2}
                 name="Invested Capital"
               />
@@ -200,7 +325,7 @@ export default function PortfolioChart({
                   type="monotone"
                   dataKey="valueMTM"
                   stroke="#3b82f6"
-                  fill="url(#mtmGradient)"
+                  fill={`url(#mtmGradient-${gid})`}
                   strokeWidth={2}
                   name="Mark-to-Market Value"
                 />
@@ -212,7 +337,7 @@ export default function PortfolioChart({
                   type="monotone"
                   dataKey="valueToDate"
                   stroke="#f97316"
-                  fill="url(#todateGradient)"
+                  fill={`url(#todateGradient-${gid})`}
                   strokeWidth={3}
                   name="ToDate Value"
                 />
@@ -328,7 +453,7 @@ export default function PortfolioChart({
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="text-left py-3 font-medium text-gray-900 dark:text-white">Mode / Metric</th>
                     <th className="text-right py-3 font-medium text-gray-900 dark:text-white">Portfolio Value</th>
-                    <th className="text-right py-3 font-medium text-gray-900 dark:text-white">P&L in {selectedCurrency}</th>
+                    <th className="text-right py-3 font-medium text-gray-900 dark:text-white">P&L in {targetFiat}</th>
                     <th className="text-right py-3 font-medium text-gray-900 dark:text-white">P&L in %</th>
                   </tr>
                 </thead>
@@ -415,6 +540,10 @@ export default function PortfolioChart({
     }
   };
 
+  if (purchases.length === 0) {
+    return null;
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
       <div className="flex flex-col space-y-4 mb-6">
@@ -445,7 +574,7 @@ export default function PortfolioChart({
               }`}
             >
               <TrendingUp className="w-4 h-4 inline mr-1" />
-              P&L ({selectedCurrency})
+              P&L ({targetFiat})
             </button>
             <button
               onClick={() => setChartType('pnl-percent')}
