@@ -28,14 +28,14 @@ export default function DataExport({ purchases, metrics, currentBTCPrice }: Data
   const generateCSVData = () => {
     const performance = calculateDCAPerformance(purchases, currentBTCPrice);
     
-    return performance?.map((point, index) => ({
-      purchase_number: index + 1,
+    return performance?.map((point, purchaseIndex) => ({
+      purchase_number: purchaseIndex + 1,
       date: point.date,
-      btc_purchased: purchases[index].amount_btc,
-      purchase_price: purchases[index].price_usd,
-      purchase_cost: purchases[index].amount_btc * purchases[index].price_usd,
-      fees: purchases[index].fee_usd,
-      exchange: purchases[index].exchange || '',
+      btc_purchased: purchases[purchaseIndex].amount_btc,
+      purchase_price: purchases[purchaseIndex].price_usd,
+      purchase_cost: purchases[purchaseIndex].amount_btc * purchases[purchaseIndex].price_usd,
+      fees: purchases[purchaseIndex].fee_usd,
+      exchange: purchases[purchaseIndex].exchange || '',
       running_btc_total: point.runningBTC,
       running_invested_total: point.runningInvested,
       avg_cost_basis: point.avgCostBasis,
@@ -43,7 +43,7 @@ export default function DataExport({ purchases, metrics, currentBTCPrice }: Data
       portfolio_value: point.currentValue,
       unrealized_pnl: point.unrealizedPnL,
       unrealized_pnl_percent: point.unrealizedPnLPercent,
-      notes: purchases[index].notes || ''
+      notes: purchases[purchaseIndex].notes || ''
     })) || [];
   };
 
@@ -103,7 +103,7 @@ Fee Efficiency: ${((metrics.totalFees / metrics.totalInvested) * 100).toFixed(2)
 ====================================
 RECENT PURCHASES (Last 5)
 ====================================
-${purchases.slice(-5).reverse().map((p, i) => 
+${purchases.slice(-5).reverse().map((p) => 
 `${new Date(p.date).toLocaleDateString()}: ₿${p.amount_btc.toFixed(8)} at ${formatCurrency(p.price_usd)} (${p.exchange || 'Unknown'})`
 ).join('\n')}
 
@@ -185,7 +185,7 @@ ${metrics.purchaseCount} purchases over ${Math.floor((new Date().getTime() - new
           title: 'My Bitcoin DCA Portfolio',
           text: summaryText,
         });
-      } catch (error) {
+      } catch {
         // Fallback to clipboard
         navigator.clipboard.writeText(summaryText);
         alert('Portfolio summary copied to clipboard!');

@@ -48,22 +48,23 @@ export default function PortfolioChart({ purchases, currentBTCPrice }: Portfolio
 
   const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: unknown[]; label?: string }) => {
     if (active && payload && payload.length) {
-      const data = (payload[0] as any)?.payload;
+      const data = (payload[0] as { payload?: Record<string, unknown> })?.payload;
+      if (!data) return null;
       return (
         <div className="bg-white dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
           <p className="font-medium text-gray-900 dark:text-white mb-2">{label}</p>
           <div className="space-y-1 text-sm">
             <p className="text-gray-600 dark:text-gray-300">
-              Portfolio Value: <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(data.portfolioValue)}</span>
+              Portfolio Value: <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(Number(data.portfolioValue) || 0)}</span>
             </p>
             <p className="text-gray-600 dark:text-gray-300">
-              Total Invested: <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(data.invested)}</span>
+              Total Invested: <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(Number(data.invested) || 0)}</span>
             </p>
             <p className="text-gray-600 dark:text-gray-300">
-              Bitcoin Held: <span className="font-medium text-gray-900 dark:text-white">{formatBTC(data.btcAmount)}</span>
+              Bitcoin Held: <span className="font-medium text-gray-900 dark:text-white">{formatBTC(Number(data.btcAmount) || 0)}</span>
             </p>
-            <p className={`${data.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              P&L: <span className="font-medium">{formatCurrency(data.pnl)} ({data.pnlPercent.toFixed(2)}%)</span>
+            <p className={`${Number(data.pnl) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              P&L: <span className="font-medium">{formatCurrency(Number(data.pnl) || 0)} ({Number(data.pnlPercent || 0).toFixed(2)}%)</span>
             </p>
           </div>
         </div>

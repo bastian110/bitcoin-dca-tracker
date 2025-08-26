@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calculator } from 'lucide-react';
-import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
+import { BitcoinPurchase } from '@/lib/types';
 import { calculatePortfolioMetrics } from '@/lib/portfolio-calculator';
 
 interface PortfolioComparisonProps {
   purchases: BitcoinPurchase[];
-  metrics: PortfolioMetrics;
   currentBTCPrice: number;
 }
 
@@ -19,7 +18,7 @@ interface ComparisonStrategy {
   calculatePurchases: (originalPurchases: BitcoinPurchase[]) => BitcoinPurchase[];
 }
 
-export default function PortfolioComparison({ purchases, metrics, currentBTCPrice }: PortfolioComparisonProps) {
+export default function PortfolioComparison({ purchases, currentBTCPrice }: PortfolioComparisonProps) {
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>(['actual', 'monthly-dca']);
 
   const strategies: ComparisonStrategy[] = [

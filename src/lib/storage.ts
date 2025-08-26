@@ -81,7 +81,7 @@ export function getStorageInfo(): { hasData: boolean; lastUpdated?: string; data
       lastUpdated: data.lastUpdated,
       dataSize: stored.length,
     };
-  } catch (error) {
+  } catch {
     return { hasData: false };
   }
 }
@@ -105,8 +105,7 @@ export function loadSettings(): AppSettings {
     
     const settings = JSON.parse(stored);
     return { ...DEFAULT_SETTINGS, ...settings };
-  } catch (error) {
-    console.error('Failed to load settings:', error);
+  } catch {
     return DEFAULT_SETTINGS;
   }
 }

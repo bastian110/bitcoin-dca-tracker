@@ -212,7 +212,6 @@ export default function Dashboard() {
                 {/* Portfolio Comparison */}
                 <PortfolioComparison 
                   purchases={purchases}
-                  metrics={calculatePortfolioMetrics(purchases, bitcoinPrice.usd)}
                   currentBTCPrice={bitcoinPrice.usd}
                 />
 
