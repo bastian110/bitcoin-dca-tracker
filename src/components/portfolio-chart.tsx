@@ -12,9 +12,17 @@ const num = (x: unknown, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 
+// Helper function to ensure we never use cryptocurrencies as fiat targets
+const validateFiatCurrency = (currency: string): string => {
+  const cryptoCurrencies = new Set(['BTC', 'Bitcoin', 'ETH', 'Ethereum', 'USDC', 'USDT', 'Tether']);
+  return cryptoCurrencies.has(currency) ? 'USD' : currency;
+};
+
 function rowCostFiatExclFees(p: BitcoinPurchase, options?: CurrencyOptions): number {
   const fx = options?.fx ?? null;
-  const target = options?.fiat ?? 'USD';
+  const rawTarget = options?.fiat ?? 'USD';
+  // CRITICAL: Never allow BTC as target currency
+  const target = validateFiatCurrency(rawTarget);
 
   // Prefer explicit fiat_amount (excl. fees)
   if (num(p.fiat_amount) > 0) {
@@ -52,7 +60,9 @@ function rowCostFiatExclFees(p: BitcoinPurchase, options?: CurrencyOptions): num
 
 function rowFeeFiat(p: BitcoinPurchase, options?: CurrencyOptions): number {
   const fx = options?.fx ?? null;
-  const target = options?.fiat ?? 'USD';
+  const rawTarget = options?.fiat ?? 'USD';
+  // CRITICAL: Never allow BTC as target currency
+  const target = validateFiatCurrency(rawTarget);
 
   // Try fee_fiat with currency first
   if (num(p.fee_fiat) > 0 && p.fiat_currency) {
@@ -124,11 +134,18 @@ export default function PortfolioChart({
   const gid = useId(); // Unique gradient IDs to prevent collisions
   
   // Force a single target fiat for both compute & format
-  const targetFiat = currencyOptions?.fiat ?? selectedCurrency;
+  // CRITICAL: Never allow BTC or other cryptocurrencies as target fiat
+  const rawTargetFiat = currencyOptions?.fiat ?? selectedCurrency;
+  const targetFiat = validateFiatCurrency(rawTargetFiat);
   
   // Warn if divergent values in development
   if (process.env.NODE_ENV !== 'production' && selectedCurrency !== targetFiat) {
     console.warn(`[PortfolioChart] selectedCurrency(${selectedCurrency}) != currencyOptions.fiat(${targetFiat}). Using ${targetFiat} for both.`);
+  }
+  
+  // Warn if we had to fallback from crypto to USD
+  if (process.env.NODE_ENV !== 'production' && rawTargetFiat !== targetFiat) {
+    console.warn(`[PortfolioChart] Invalid target currency '${rawTargetFiat}' detected. Cryptocurrencies cannot be used as target fiat currency. Falling back to USD.`);
   }
 
   // Convert current BTC price to target currency with explicit source currency

@@ -7,16 +7,27 @@ import {
   DCAPerformancePoint
 } from './types';
 
-// Utility function to detect currencies in purchase data
+// Utility function to detect FIAT currencies in purchase data (excludes cryptocurrencies)
 export function detectCurrenciesInPurchases(purchases: BitcoinPurchase[]): string[] {
   const currencies = new Set<string>();
   
+  // Known cryptocurrencies to exclude
+  const cryptoCurrencies = new Set(['BTC', 'Bitcoin', 'ETH', 'Ethereum', 'USDC', 'USDT', 'Tether']);
+  
   purchases.forEach(p => {
-    // Add currencies from various fields
-    if (p.fiat_currency) currencies.add(p.fiat_currency);
-    if (p.currency_sent) currencies.add(p.currency_sent);
-    if (p.currency_received) currencies.add(p.currency_received);
-    if (p.fee_currency) currencies.add(p.fee_currency);
+    // Add currencies from various fields, but filter out known cryptocurrencies
+    if (p.fiat_currency && !cryptoCurrencies.has(p.fiat_currency)) {
+      currencies.add(p.fiat_currency);
+    }
+    if (p.currency_sent && !cryptoCurrencies.has(p.currency_sent)) {
+      currencies.add(p.currency_sent);
+    }
+    if (p.currency_received && !cryptoCurrencies.has(p.currency_received)) {
+      currencies.add(p.currency_received);
+    }
+    if (p.fee_currency && !cryptoCurrencies.has(p.fee_currency)) {
+      currencies.add(p.fee_currency);
+    }
     
     // Always include USD if price_usd or fee_usd is present
     if (p.price_usd > 0 || (p.fee_usd && p.fee_usd > 0)) {
@@ -24,9 +35,10 @@ export function detectCurrenciesInPurchases(purchases: BitcoinPurchase[]): strin
     }
   });
   
-  // Remove empty/null values and sort
+  // Remove empty/null values, filter out any remaining crypto currencies, and sort
   return Array.from(currencies)
     .filter(Boolean)
+    .filter(currency => !cryptoCurrencies.has(currency))
     .sort((a, b) => {
       // Prioritize USD first, then alphabetical
       if (a === 'USD') return -1;

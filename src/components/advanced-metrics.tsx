@@ -1,14 +1,16 @@
 'use client';
 
 import { BitcoinPurchase, PortfolioMetrics } from '@/lib/types';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, SimpleFXProvider } from '@/lib/currency';
 import { TrendingUp, TrendingDown, Calendar, DollarSign, Bitcoin, Target, Clock, Activity } from 'lucide-react';
 
 interface AdvancedMetricsProps {
   purchases: BitcoinPurchase[];
   metrics: PortfolioMetrics;
   currentBTCPrice: number;
+  currentPriceCurrency?: string; // Currency of currentBTCPrice
   selectedCurrency?: string;
+  fxProvider?: SimpleFXProvider; // For currency conversion
 }
 
 interface MetricCardProps {
@@ -70,10 +72,39 @@ function MetricCard({ title, value, subValue, icon, trend, trendValue, descripti
   );
 }
 
-export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice, selectedCurrency = 'USD' }: AdvancedMetricsProps) {
+export default function AdvancedMetrics({ 
+  purchases, 
+  metrics, 
+  currentBTCPrice, 
+  currentPriceCurrency = 'USD',
+  selectedCurrency = 'USD',
+  fxProvider 
+}: AdvancedMetricsProps) {
   const formatCurrencyAmount = (amount: number) => {
     return formatCurrency(amount, selectedCurrency);
   };
+
+  // Convert current BTC price to selected currency if needed
+  const convertedBTCPrice = (() => {
+    // If the price is already in the selected currency, use it directly
+    if (currentPriceCurrency === selectedCurrency) {
+      return currentBTCPrice;
+    }
+    
+    // If no FX provider available, assume the price is in the correct currency
+    // (this happens when the API fetches price directly in the selected currency)
+    if (!fxProvider) {
+      return currentBTCPrice;
+    }
+    
+    const rate = fxProvider.getRate(currentPriceCurrency, selectedCurrency);
+    if (!rate) {
+      // No conversion rate available, assume the price is correct
+      return currentBTCPrice;
+    }
+    
+    return currentBTCPrice * rate;
+  })();
 
   const formatBTC = (amount: number) => {
     return `₿${amount.toFixed(8)}`;
@@ -91,7 +122,7 @@ export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice, s
     Math.floor((new Date().getTime() - new Date(metrics.lastPurchaseDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
   
   // Calculate if current price is above or below average cost basis
-  const priceVsCostBasis = ((currentBTCPrice - metrics.averageCostBasis) / metrics.averageCostBasis) * 100;
+  const priceVsCostBasis = ((convertedBTCPrice - metrics.averageCostBasis) / metrics.averageCostBasis) * 100;
   
   // Calculate efficiency metrics
   const btcPerDollar = metrics.totalInvested > 0 ? metrics.totalBTC / metrics.totalInvested : 0;
@@ -122,7 +153,7 @@ export default function AdvancedMetrics({ purchases, metrics, currentBTCPrice, s
           <MetricCard
             title="Average Cost Basis"
             value={formatCurrencyAmount(metrics.averageCostBasis)}
-            subValue={`vs Current: ${formatCurrencyAmount(currentBTCPrice)}`}
+            subValue={`vs Current: ${formatCurrencyAmount(convertedBTCPrice)}`}
             icon={<Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />}
             trend={priceVsCostBasis >= 0 ? 'up' : 'down'}
             trendValue={formatPercent(priceVsCostBasis)}

@@ -49,11 +49,11 @@ export default function Dashboard() {
     }
   }, [purchases]);
 
-  // Fetch Bitcoin price on component mount
+  // Fetch Bitcoin price when component mounts or currency changes
   useEffect(() => {
     const fetchPrice = async () => {
       setPriceLoading(true);
-      const price = await getCurrentBitcoinPrice();
+      const price = await getCurrentBitcoinPrice(selectedCurrency);
       setBitcoinPrice(price);
       setPriceLoading(false);
     };
@@ -63,7 +63,7 @@ export default function Dashboard() {
     // Refresh price every 5 minutes
     const interval = setInterval(fetchPrice, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedCurrency]); // Re-fetch when currency changes
 
   // Initialize filtered purchases
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function Dashboard() {
     if (filteredPurchases.length > 0 && bitcoinPrice) {
       const calculatedMetrics = calculatePortfolioMetrics(
         filteredPurchases, 
-        bitcoinPrice.usd,
+        bitcoinPrice.usd || bitcoinPrice.price,
         {
           fiat: selectedCurrency,
           fx: fxProvider,
@@ -120,6 +120,7 @@ export default function Dashboard() {
   const formatCurrency = (amount: number) => {
     return formatCurrencyUtil(amount, selectedCurrency);
   };
+
 
   const formatBTC = (amount: number) => {
     return `₿${amount.toFixed(8)}`;
@@ -172,14 +173,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 dark:text-gray-400">BTC Price:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {formatPrice(bitcoinPrice.usd)}
+                    {formatPrice(bitcoinPrice.price, bitcoinPrice.currency)}
                   </span>
                   <span className={`text-sm font-medium ${
-                    bitcoinPrice.usd_24h_change >= 0 
+                    bitcoinPrice.price_24h_change >= 0 
                       ? 'text-green-600 dark:text-green-400' 
                       : 'text-red-600 dark:text-red-400'
                   }`}>
-                    {formatPriceChange(bitcoinPrice.usd_24h_change)}
+                    {formatPriceChange(bitcoinPrice.price_24h_change)}
                   </span>
                 </div>
               )}
@@ -234,14 +235,16 @@ export default function Dashboard() {
                 <AdvancedMetrics 
                   purchases={filteredPurchases} 
                   metrics={metrics} 
-                  currentBTCPrice={bitcoinPrice.usd}
+                  currentBTCPrice={bitcoinPrice.price}
+                  currentPriceCurrency={bitcoinPrice.currency}
                   selectedCurrency={selectedCurrency}
+                  fxProvider={fxProvider}
                 />
 
                 {/* Portfolio Chart */}
                 <PortfolioChart 
                   purchases={filteredPurchases} 
-                  currentBTCPrice={bitcoinPrice.usd}
+                  currentBTCPrice={bitcoinPrice.usd || bitcoinPrice.price}
                   currentPriceCurrency="USD"
                   selectedCurrency={selectedCurrency}
                   currencyOptions={{
@@ -260,14 +263,14 @@ export default function Dashboard() {
                 {/* Portfolio Comparison */}
                 <PortfolioComparison 
                   purchases={purchases}
-                  currentBTCPrice={bitcoinPrice.usd}
+                  currentBTCPrice={bitcoinPrice.usd || bitcoinPrice.price}
                 />
 
                 {/* Data Export */}
                 <DataExport 
                   purchases={filteredPurchases} 
                   metrics={metrics} 
-                  currentBTCPrice={bitcoinPrice.usd}
+                  currentBTCPrice={bitcoinPrice.usd || bitcoinPrice.price}
                   selectedCurrency={selectedCurrency}
                 />
               </div>
