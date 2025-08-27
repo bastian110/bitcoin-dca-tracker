@@ -101,6 +101,7 @@ export interface MetricOptions {
 export interface CurrencyOptions {
   fiat?: string;        // target, default 'USD'
   fx?: FXRates | null;  // required if mixing currencies
+  currentPriceCurrency?: string; // Currency of currentBTCPrice, default 'USD'
 }
 
 export type DCAMode = 'toDate' | 'markToMarket';

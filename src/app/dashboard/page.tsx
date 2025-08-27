@@ -75,10 +75,11 @@ export default function Dashboard() {
     if (filteredPurchases.length > 0 && bitcoinPrice) {
       const calculatedMetrics = calculatePortfolioMetrics(
         filteredPurchases, 
-        bitcoinPrice.usd || bitcoinPrice.price,
+        bitcoinPrice.price,
         {
           fiat: selectedCurrency,
           fx: fxProvider,
+          currentPriceCurrency: bitcoinPrice.currency,
         }
       );
       setMetrics(calculatedMetrics);

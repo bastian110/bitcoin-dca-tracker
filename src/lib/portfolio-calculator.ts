@@ -53,6 +53,21 @@ const num = (x: unknown, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 
+// Helper function to convert price from one currency to target currency
+export function convertPriceToTarget(
+  price: number,
+  priceCur: string,
+  target: string,
+  fx?: { getRate: (from: string, to: string, date?: string) => number | null } | null,
+  date?: string
+): number {
+  if (priceCur === target) return price;
+  if (!fx) throw new Error(`FX required to convert ${priceCur}->${target}`);
+  const r = fx.getRate(priceCur, target, date) ?? fx.getRate(priceCur, target);
+  if (!r) throw new Error(`Missing FX ${priceCur}->${target} on ${date ?? 'n/a'}`);
+  return price * r;
+}
+
 // Row cost calculation functions for currency normalization
 function rowCostFiatExclFees(p: BitcoinPurchase, options?: CurrencyOptions): number {
   const targetFiat = options?.fiat ?? 'USD';
@@ -113,6 +128,7 @@ export function calculatePortfolioMetrics(
   options?: MetricOptions & CurrencyOptions
 ): PortfolioMetrics {
   const targetFiat = options?.fiat ?? 'USD';
+  const priceCur = options?.currentPriceCurrency ?? 'USD';
   if (purchases.length === 0) {
     return {
       totalBTC: 0,
@@ -167,8 +183,19 @@ export function calculatePortfolioMetrics(
     ? averageExecutionPrice
     : averageEffectiveCostBasis;
 
-  // Calculate current value and P&L
-  const currentValue = totalBTC * num(currentBTCPrice);
+  // Calculate current value and P&L with proper currency conversion
+  const btcForValuation = totalBTC; // NOTE: using purchased BTC (no lot/withdrawal adjustment yet)
+  
+  // Convert current BTC price to target fiat currency
+  const currentPriceFiat = convertPriceToTarget(
+    num(currentBTCPrice),
+    priceCur,
+    targetFiat,
+    options?.fx,
+    sortedPurchases[sortedPurchases.length - 1]?.date // Use last purchase date for FX rate
+  );
+  
+  const currentValue = btcForValuation * currentPriceFiat;
   const totalInvested = options?.basis === 'execution' ? totalCostFiatExclFees : totalInvestedFiat;
   const unrealizedPnL = currentValue - totalInvested;
   const unrealizedPnLPercent = totalInvested > 0 ? (unrealizedPnL / totalInvested) * 100 : 0;
@@ -317,6 +344,8 @@ export function calculateDCAPerformance(
 
   const mode = options?.mode ?? 'toDate';
   const getHist = options?.getHistoricalPrice;
+  const targetFiat = options?.fiat ?? 'USD';
+  const priceCur = options?.currentPriceCurrency ?? 'USD';
 
   let runningBTC = 0;
   let runningCostFiatExclFees = 0;
@@ -339,10 +368,15 @@ export function calculateDCAPerformance(
 
       const priceForPoint =
         mode === 'markToMarket'
-          ? (getHist ? num(getHist(p.date)) : (() => { throw new Error('getHistoricalPrice required for markToMarket'); })())
-          : num(currentBTCPrice);
+          ? (() => {
+              if (!getHist) throw new Error('getHistoricalPrice required for markToMarket');
+              // Historical price is assumed to be in target fiat (simplest approach)
+              // If it's in a different currency, you would need getHistoricalPriceWithCurrency
+              return num(getHist(p.date));
+            })()
+          : convertPriceToTarget(num(currentBTCPrice), priceCur, targetFiat, options?.fx, p.date);
 
-      const currentValue = runningBTC * num(priceForPoint);
+      const currentValue = runningBTC * priceForPoint;
       const unrealizedPnL = currentValue - runningInvested;
       const unrealizedPnLPercent = runningInvested > 0 ? (unrealizedPnL / runningInvested) * 100 : 0;
 
