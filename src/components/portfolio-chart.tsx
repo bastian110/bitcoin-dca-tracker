@@ -535,17 +535,50 @@ export default function PortfolioChart({
             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
               <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <Info className="w-4 h-4" />
-                Definitions & Formulas
+                📖 Definitions
               </h4>
-              <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+              <div className="space-y-4 text-sm">
                 <div>
-                  <span className="font-medium text-gray-900 dark:text-white">Mark-to-Market:</span> Portfolio value using historical BTC price at each purchase date. Shows &ldquo;what was it worth then?&rdquo;
+                  <div className="font-medium text-gray-900 dark:text-white mb-1">
+                    ToDate (default): 💰
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-300 mb-1">
+                    Your real profit or loss today.
+                  </div>
+                  <div className="text-gray-500 dark:text-gray-400 text-xs">
+                    All your Bitcoin is valued at the current market price, compared to your total invested capital.
+                  </div>
                 </div>
+                
                 <div>
-                  <span className="font-medium text-gray-900 dark:text-white">ToDate:</span> Portfolio value using today&apos;s BTC price. Shows &ldquo;what would those coins be worth if I stopped DCA at that point?&rdquo;
+                  <div className="font-medium text-gray-900 dark:text-white mb-1">
+                    Mark-to-Market (MTM): 🎯
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-300 mb-1">
+                    A diagnostic of your buy timing.
+                  </div>
+                  <div className="text-gray-500 dark:text-gray-400 text-xs">
+                    At each purchase date, your entire stack is re-valued at the market price of that day, then compared to your invested capital. It shows whether your DCA entries were advantageous or disadvantageous relative to the market at the time.
+                  </div>
                 </div>
+                
                 <div>
-                  <span className="font-medium text-gray-900 dark:text-white">Invested Capital:</span> Cumulative fiat spent (baseline for P&L calculations).
+                  <div className="font-medium text-gray-900 dark:text-white mb-1">
+                    Invested Capital:
+                  </div>
+                  <div className="text-gray-500 dark:text-gray-400 text-xs">
+                    Cumulative fiat spent (baseline for P&L calculations).
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">👉 This way:</span>
+                    <br />
+                    <span className="text-orange-600 dark:text-orange-400">ToDate = what you could cash out now 💰</span>
+                    <br />
+                    <span className="text-blue-600 dark:text-blue-400">MTM = how well you timed your buys 🎯</span>
+                  </div>
                 </div>
               </div>
             </div>
