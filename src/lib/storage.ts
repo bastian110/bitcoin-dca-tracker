@@ -124,18 +124,32 @@ export function exportAllData(): string {
 export function importAllData(jsonData: string): boolean {
   try {
     const data = JSON.parse(jsonData);
-    
+
     if (data.portfolio) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data.portfolio));
     }
-    
+
     if (data.settings) {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
     }
-    
+
     return true;
   } catch (error) {
     console.error('Failed to import data:', error);
+    return false;
+  }
+}
+
+export function clearAllData(): boolean {
+  try {
+    // Clear all app-related localStorage items
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem('bitcoin-dca-selected-currency');
+
+    return true;
+  } catch (error) {
+    console.error('Failed to clear all data:', error);
     return false;
   }
 }
